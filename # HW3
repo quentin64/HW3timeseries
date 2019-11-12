@@ -1,0 +1,210 @@
+# some packages we will use
+require(quantmod)
+require(forecast)
+require(fBasics)
+require(CADFtest)
+require(urca)
+# install.packages("sandwich")
+require(sandwich)
+# install.packages("lmtest")
+require(lmtest)
+require(nlme)
+# install.packages("MTS")
+require(MTS)
+require(car)
+# install.packages("strucchange")
+require(strucchange)
+require(vars)
+# install.packages for seasonal adjustment
+install.packages("Ecdat")
+library(Ecdat)
+
+install.packages("seasonal")
+library(seasonal)
+
+require(xts)
+
+
+# Global price of Brent Crude
+getSymbols("POILBREUSDM",src="FRED")
+dim(POILBREUSDM)
+head(POILBREUSDM)
+tail(POILBREUSDM)
+plot(POILBREUSDM)
+chartSeries(POILBREUSDM,type=c("line"),theme="white",TA=NULL)
+
+Boil <- POILBREUSDM$POILBREUSDM
+plot(Boil)
+Boil <- na.omit(Boil)
+plot(Boil)
+
+# Adjust seasonally the BOIL
+
+ts_oil = ts(Boil, frequency = 12, start = 1999)
+ts_oil = ts(ts_oil [c(0:228)],freq=12,start=1999)
+decompose_oil = decompose(ts_oil, "multiplicative")
+adjust_oil = ts_oil / decompose_oil$seasonal
+plot(adjust_oil, lwd = 2)
+
+head(adjust_oil)
+tail(adjust_oil)
+
+
+# question 1
+
+dBoil = na.remove(diff(log(adjust_oil)))
+adf.test(Boil)
+adf.test(dBoil)
+
+
+# Global price of Natural gas, EU
+getSymbols("PNGASEUUSDM",src="FRED")
+dim(PNGASEUUSDM)
+head(PNGASEUUSDM)
+tail(PNGASEUUSDM)
+plot(PNGASEUUSDM)
+chartSeries(PNGASEUUSDM,type=c("line"),theme="white",TA=NULL)
+
+Bgas <-PNGASEUUSDM$PNGASEUUSDM
+plot(Bgas)
+Bgas <- na.omit(Bgas)
+plot(Bgas)
+
+# Adjust seasonally the BGAS
+
+ts_gas = ts(Bgas, frequency = 12, start = 1999)
+ts_gas = ts(ts_gas [c(0:228)],freq=12,start=1999)
+decompose_oil = decompose(ts_gas, "multiplicative")
+adjust_gas = ts_gas / decompose_oil$seasonal
+plot(adjust_gas, lwd = 2)
+
+head(adjust_gas)
+tail(adjust_gas)
+
+
+# question 1
+
+dBgas = na.remove(diff(log(adjust_gas)))
+adf.test(Bgas)
+adf.test(dBgas)
+
+cbind(adjust_gas,adjust_oil)
+
+# Stock TOTAL S.A. (TOT)
+getSymbols("TOT",from="1999-01-01",to="2017-12-31")
+dim(TOT) 
+head(TOT) 
+TOT <- TOT$TOT.Close
+plot(TOT)
+
+# question 1
+TOT <- apply.monthly(TOT, FUN=sum, na.rm=TRUE)
+dTOT = na.remove(diff(TOT))
+adf.test(TOT)
+adf.test(dTOT)
+
+head(TOT)
+tail(TOT)
+
+
+
+
+
+# question 2
+# need to make sure they cover the same time span
+HW3 <-cbind(dTOT,dBgas,dBoil)
+plot(HW3)
+
+# Structural breaks. Is there a break in the oil return series? In the gas - oil price relationship?
+# Here's the basic regression
+basicreg <- lm(dBgas~dBoil)
+summary(basicreg)
+coeftest(basicreg,vcov=vcovHAC(basicreg))
+
+# estimate and investigate break points in the oil mean using strucchange package
+# by default searching as many as five break points:
+bp_doil = breakpoints(dBoil~1)
+# get confidence intervals around timing of breaks:
+ci_doil = confint(bp_doil)
+# optimal zero break points:
+summary(bp_doil)
+plot(bp_doil)
+# print the intercept coefficients: 
+coef(bp_doil,breaks=0)
+# print if we force it to have one break (just for comparison):
+coef(bp_doil,breaks=1)
+# get the standard errors on the intercepts using HAC standard errors:
+sqrt(sapply(vcov(bp_doil, breaks = 0), diag))
+
+# estimate and investigate break points in the gas mean using strucchange package
+# by default searching as many as five break points:
+bp_dgas = breakpoints(dBgas~1)
+# get confidence intervals around timing of breaks:
+ci_dgas = confint(bp_dgas)
+# optimal zero break points:
+summary(bp_dgas)
+# see that BIC lowest at zero breaks:
+plot(bp_dgas)
+# print the intercept coefficients: 
+coef(bp_dgas,breaks=0)
+# print if we force it to have one break (just for comparison):
+coef(bp_dgas,breaks=1)
+# get the standard errors on the intercepts using HAC standard errors:
+sqrt(sapply(vcov(bp_dgas, breaks = 0), diag))
+
+
+# question 3
+# let's first use the stationary 
+# structural break in the Brent-LNG PRICE relationship
+bp.gasoil = breakpoints(dBgas~dBoil)
+ci.gasoil = confint(bp.gasoil,breaks=1)
+summary(bp.gasoil)
+plot(bp.gasoil)
+breakpoints(bp.gasoil)
+
+
+
+
+# question 5
+basicreg2 <- lm(adjust_oil~adjust_gas)
+summary(basicreg2)
+coeftest(basicreg2,vcov=vcovHAC(basicreg2))
+Box.test(basicreg2$residuals,lag=100)
+basicreg2.res = resid(basicreg2)
+plot(basicreg2.res)
+
+# question 6
+POILBREUSDM
+PNGASEUUSDM
+
+godlev = merge(POILBREUSDM,PNGASEUUSDM,join="inner")
+MTSplot(godlev)
+ts.plot(residuals(lm(POILBREUSDM~PNGASEUUSDM,data=godlev)))
+# looks stationary for awhile and then goes crazy
+
+
+# Phillips-Ouliaris test:
+
+# Constant
+
+godco=ca.po(godlev,demean=c("constant"),type="Pu",lag="short")
+summary(godco)
+# reject: 51.3085 > 33.713 - residual has no unit root, cointegrated
+godco1=ca.po(godlev,demean=c("constant"),type="Pz",lag="short")
+summary(godco1)
+# same conclusion
+xgod = ca.jo(godlev,ecdet="const")
+summary(xgod)
+
+# Trend
+
+godcot=ca.po(godlev,demean=c("trend"),type="Pz",lag="long")
+summary(godcot)
+# we do not reject: 63.683  < 81.3812 - residual has unit root, not cointegrated
+
+godcot=ca.po(godlev,demean=c("trend"),type="Pu",lag="long")
+summary(godcot)
+# same conclusion
+
+xgod = ca.jo(godlev,ecdet="trend")
+summary(xgod)
