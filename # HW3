@@ -121,6 +121,8 @@ basicreg <- lm(dBgas~dBoil)
 summary(basicreg)
 coeftest(basicreg,vcov=vcovHAC(basicreg))
 
+# Global price of Brent Crude
+
 # estimate and investigate break points in the oil mean using strucchange package
 # by default searching as many as five break points:
 bp_doil = breakpoints(dBoil~1)
@@ -135,6 +137,8 @@ coef(bp_doil,breaks=0)
 coef(bp_doil,breaks=1)
 # get the standard errors on the intercepts using HAC standard errors:
 sqrt(sapply(vcov(bp_doil, breaks = 0), diag))
+
+# Global price of Natural gas, EU
 
 # estimate and investigate break points in the gas mean using strucchange package
 # by default searching as many as five break points:
@@ -152,16 +156,34 @@ coef(bp_dgas,breaks=1)
 # get the standard errors on the intercepts using HAC standard errors:
 sqrt(sapply(vcov(bp_dgas, breaks = 0), diag))
 
+# Stock TOTAL S.A. (TOT)
+
+# estimate and investigate break points in the gas mean using strucchange package
+# by default searching as many as five break points:
+bp_dTOT = breakpoints(dTOT~1)
+# get confidence intervals around timing of breaks:
+ci_dTOT = confint(bp_dTOT)
+# optimal zero break points:
+summary(bp_dTOT)
+# see that BIC lowest at zero breaks:
+plot(bp_dTOT)
+# print the intercept coefficients: 
+coef(bp_dTOT,breaks=0)
+# print if we force it to have one break (just for comparison):
+coef(bp_dTOT,breaks=1)
+# get the standard errors on the intercepts using HAC standard errors:
+sqrt(sapply(vcov(bp_dgas, breaks = 0), diag))
+
 
 # question 3
 # let's first use the stationary 
-# structural break in the Brent-LNG PRICE relationship
+# structural break in the Brent-NG PRICE relationship
 bp.gasoil = breakpoints(dBgas~dBoil)
-ci.gasoil = confint(bp.gasoil,breaks=1)
+ci.gasoil = confint(bp.gasoil)
 summary(bp.gasoil)
 plot(bp.gasoil)
 breakpoints(bp.gasoil)
-
+coef(bp.gasoil,breaks=1)
 
 
 
@@ -185,17 +207,6 @@ ts.plot(residuals(lm(POILBREUSDM~PNGASEUUSDM,data=godlev)))
 
 # Phillips-Ouliaris test:
 
-# Constant
-
-godco=ca.po(godlev,demean=c("constant"),type="Pu",lag="short")
-summary(godco)
-# reject: 51.3085 > 33.713 - residual has no unit root, cointegrated
-godco1=ca.po(godlev,demean=c("constant"),type="Pz",lag="short")
-summary(godco1)
-# same conclusion
-xgod = ca.jo(godlev,ecdet="const")
-summary(xgod)
-
 # Trend
 
 godcot=ca.po(godlev,demean=c("trend"),type="Pz",lag="long")
@@ -208,3 +219,65 @@ summary(godcot)
 
 xgod = ca.jo(godlev,ecdet="trend")
 summary(xgod)
+
+dBgas~dBoil
+
+# question 4
+HW3a <-cbind(dTOT,dBgas,dBoil)
+plot(HW3a)
+
+
+dgas = ts(na.omit(diff(dTOT)),freq=12,start=1999+1/12)
+doil = ts(na.omit(diff(dBgas)),freq=12,start=1999+1/12)
+dtot = ts(na.omit(diff(dBoil)),freq=12,start=1999+1/12)
+
+god = cbind(dgas,doil,dtot)
+MTSplot(god)
+
+x6 = dynlm(dtot ~ L(dgas,c(1:6)) + L(doil,c(1:6)) + L(dtot,c(1:6)))
+a6 = AIC(x6)
+F6 = linearHypothesis(x6,c("L(dgas, c(1:6))6=0","L(doil, c(1:6))6=0" ,"L(dtot, c(1:6))6=0"),vcov=vcovHAC(x6),test="F",data=x6)
+f6p = F6$`Pr(>F)`
+
+x5 = dynlm(dtot ~ L(dgas,c(1:5)) + L(doil,c(1:5)) + L(dtot,c(1:5)))
+a5 = AIC(x5)
+F5 = linearHypothesis(x5,c("L(dgas, c(1:5))5=0","L(doil, c(1:5))5=0" ,"L(dtot, c(1:5))5=0"),vcov=vcovHAC(x5),test="F",data=x5)
+f5p = F5$`Pr(>F)`
+
+x4 = dynlm(dtot ~ L(dgas,c(1:4)) + L(doil,c(1:4)) + L(dtot,c(1:4)))
+a4 = AIC(x4)
+F4 = linearHypothesis(x4,c("L(dgas, c(1:4))4=0","L(doil, c(1:4))4=0" ,"L(dtot, c(1:4))4=0"),vcov=vcovHAC(x4),test="F",data=x4)
+f4p = F4$`Pr(>F)`
+
+x3 = dynlm(dtot ~ L(dgas,c(1:3)) + L(doil,c(1:3)) + L(dtot,c(1:3)))
+a3 = AIC(x3)
+F3 = linearHypothesis(x3,c("L(dgas, c(1:3))3=0","L(doil, c(1:3))3=0" ,"L(dtot, c(1:3))3=0"),vcov=vcovHAC(x3),test="F",data=x3)
+f3p = F3$`Pr(>F)`
+
+x2 = dynlm(dtot ~ L(dgas,c(1:2)) + L(doil,c(1:2)) + L(dtot,c(1:2)))
+a2 = AIC(x2)
+F2 = linearHypothesis(x2,c("L(dgas, c(1:2))2=0","L(doil, c(1:2))2=0" ,"L(dtot, c(1:2))2=0"),vcov=vcovHAC(x2),test="F",data=x2)
+f2p = F2$`Pr(>F)`
+
+x1 = dynlm(dtot ~ L(dgas,c(1:1)) + L(doil,c(1:1)) + L(dtot,c(1:1)))
+a1 = AIC(x1)
+F1 = linearHypothesis(x1,c("L(dgas, c(1:1))=0","L(doil, c(1:1))=0" ,"L(dtot, c(1:1))=0"),vcov=vcovHAC(x1),test="F",data=x1)
+f1p = F1$`Pr(>F)`
+
+F.results = c(f1p,f2p,f3p,f4p,f5p,f6p)
+F.results
+AIC.results = c(a1,a2,a3,a4,a5,a6)
+AIC.results
+
+# F-stat highest for 5th lag order & AIC lowest for 6th lag order
+
+tsdisplay(residuals(x6))
+tsdisplay(residuals(x5))
+
+# Test Granger Causality
+# do oil price changes or gas price changes granger-cause drilling activity changes?
+
+linearHypothesis(x5,c("L(doil, c(1:5))1=0","L(doil, c(1:5))2=0" ,"L(doil, c(1:5))3=0","L(doil, c(1:5))4=0", "L(doil, c(1:5))5=0"),vcov=vcovHAC(x5),test="F",data=x5)
+
+
+linearHypothesis(x6,c("L(doil, c(1:6))1=0","L(doil, c(1:6))2=0" ,"L(doil, c(1:6))3=0","L(doil, c(1:6))4=0","L(doil, c(1:6))5=0","L(doil, c(1:6))6=0"),vcov=vcovHAC(x6),test="F",data=x6)
